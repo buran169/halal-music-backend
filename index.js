@@ -31,7 +31,7 @@ bot.on(["voice","audio"], async (ctx) => {
     if(ctx.message.voice) fileId = ctx.message.voice.file_id;
     else if(ctx.message.audio) fileId = ctx.message.audio.file_id;
 
-   let title = message.caption || "Unknown";
+   let title = ctx.message.caption || "Unknown";
    title = title.replace(/@\S+/g, "").trim(); // সব @username remove করবে
     const fileLink = await ctx.telegram.getFileLink(fileId);
 
