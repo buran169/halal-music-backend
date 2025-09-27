@@ -2,11 +2,6 @@
 const express = require("express");
 const cors = require("cors");
 const { Telegraf } = require("telegraf");
-const fs = require("fs");
-const path = require("path");
-const axios = require("axios");
-
-// Firebase (CommonJS)
 const { initializeApp } = require("firebase/app");
 const { getFirestore, collection, addDoc, getDocs } = require("firebase/firestore");
 
@@ -14,9 +9,9 @@ const { getFirestore, collection, addDoc, getDocs } = require("firebase/firestor
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static("public")); // public folder for frontend if needed
 
-// Telegram Bot Token from Environment
+// Telegram Bot Token from environment
 const BOT_TOKEN = process.env.BOT_TOKEN;
 if (!BOT_TOKEN) {
   console.error("❌ BOT_TOKEN not set!");
@@ -24,7 +19,7 @@ if (!BOT_TOKEN) {
 }
 const bot = new Telegraf(BOT_TOKEN);
 
-// Firebase Config from Environment
+// Firebase config from environment
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_PROJECT_ID + ".firebaseapp.com",
@@ -34,6 +29,7 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
+// Initialize Firebase
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 
@@ -43,16 +39,16 @@ bot.on("audio", async (ctx) => {
     const file = ctx.message.audio;
     const title = file.title || file.file_name || "Unknown";
 
-    // Telegram file URL
+    // Get Telegram file URL
     const fileLink = await ctx.telegram.getFileLink(file.file_id);
 
-    // Save song info to Firebase Firestore
+    // Save song to Firebase
     await addDoc(collection(db, "songs"), {
       title: title,
       url: fileLink.href
     });
 
-    await ctx.reply(`✅ Uploaded to Firebase: ${title}`);
+    await ctx.reply(`✅ Uploaded: ${title}`);
     console.log("✅ Added:", title);
   } catch (err) {
     console.error("❌ Error adding song:", err.message);
@@ -60,7 +56,7 @@ bot.on("audio", async (ctx) => {
   }
 });
 
-// API for frontend
+// API for frontend fetch
 app.get("/songs", async (req, res) => {
   try {
     const querySnapshot = await getDocs(collection(db, "songs"));
@@ -72,6 +68,7 @@ app.get("/songs", async (req, res) => {
   }
 });
 
-// Start server & bot
+// Start bot and server
 bot.launch();
-app.listen(3000, () => console.log("🚀 Server running on port 3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
