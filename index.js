@@ -3,14 +3,13 @@ import cors from "cors";
 import { Telegraf } from "telegraf";
 import { createClient } from "@supabase/supabase-js";
 
-// Environment Variables
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const PORT = process.env.PORT || 10000;
 
 if (!BOT_TOKEN || !SUPABASE_URL || !SUPABASE_KEY) {
-  console.error("❌ Environment variables missing!");
+  console.error("❌ Missing environment variables!");
   process.exit(1);
 }
 
@@ -25,14 +24,19 @@ app.use(express.json());
 // Telegram Bot setup
 const bot = new Telegraf(BOT_TOKEN);
 
-// Bot command: forward song
-bot.on("voice", async (ctx) => {
+// Bot: forward audio/voice
+bot.on(["voice","audio"], async (ctx) => {
   try {
-    const fileLink = await ctx.telegram.getFileLink(ctx.message.voice.file_id);
-    const title = ctx.message.caption || "Untitled Song";
+    let fileId;
+    if(ctx.message.voice) fileId = ctx.message.voice.file_id;
+    else if(ctx.message.audio) fileId = ctx.message.audio.file_id;
 
-    // Save to Supabase
-    const { data, error } = await supabase.from("songs").insert([{ title, url: fileLink.href }]);
+    const title = ctx.message.caption || "Untitled Song";
+    const fileLink = await ctx.telegram.getFileLink(fileId);
+
+    const { data, error } = await supabase.from("songs").insert([
+      { title, url: fileLink.href }
+    ]);
     if (error) throw error;
 
     ctx.reply(`✅ Song saved: ${title}`);
@@ -44,10 +48,12 @@ bot.on("voice", async (ctx) => {
 
 bot.launch();
 
-// Express endpoint: fetch songs
+// Express API: fetch songs
 app.get("/songs", async (req, res) => {
   try {
-    const { data, error } = await supabase.from("songs").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("songs")
+      .select("*")
+      .order("created_at", { ascending: false });
     if (error) throw error;
     res.json(data);
   } catch (err) {
