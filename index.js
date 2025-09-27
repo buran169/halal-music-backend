@@ -31,8 +31,7 @@ bot.on(["voice","audio"], async (ctx) => {
     if(ctx.message.voice) fileId = ctx.message.voice.file_id;
     else if(ctx.message.audio) fileId = ctx.message.audio.file_id;
 
-   let title = ctx.message.caption || "Unknown";
-   title = title.replace(/@\S+/g, "").trim(); // সব @username remove করবে
+   const title = ctx.message.audio.title || ctx.message.audio.file_name || "Unknown Song";
     const fileLink = await ctx.telegram.getFileLink(fileId);
 
     const { data, error } = await supabase.from("songs").insert([
