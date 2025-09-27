@@ -1,97 +1,51 @@
-const { Telegraf } = require('telegraf');
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const cors = require('cors');
+import express from "express";
+import cors from "cors";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, getDocs, addDoc } from "firebase/firestore";
+import { Telegraf } from "telegraf";
+import fs from "fs";
 
-// Your Telegram Bot Token
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if(!BOT_TOKEN){
-    console.error("❌ BOT_TOKEN not set!");
-    process.exit(1);
-}
-
-const bot = new Telegraf(BOT_TOKEN);
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static("public"));
 
-// Paths
-const publicDir = path.join(__dirname, 'public');
-const songsFolder = path.join(publicDir, 'songs');
-const songsJsonFile = path.join(publicDir, 'songs.json');
+// Firebase setup
+const firebaseConfig = {
+  apiKey: "AIzaSyArmHweHZp3sOM2FMI61Sm-obTHTAK1sbE",
+  authDomain: "halalmusic-1c5e3.firebaseapp.com",
+  projectId: "halalmusic-1c5e3",
+  storageBucket: "halalmusic-1c5e3.firebasestorage.app",
+  messagingSenderId: "469402288671",
+  appId: "1:469402288671:web:5d68b4a5211b8ccd314b2a"
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
 
-// Ensure folders/files exist
-if(!fs.existsSync(publicDir)) fs.mkdirSync(publicDir);
-if(!fs.existsSync(songsFolder)) fs.mkdirSync(songsFolder);
-if(!fs.existsSync(songsJsonFile)) fs.writeFileSync(songsJsonFile, '[]');
+// Telegram Bot
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const bot = new Telegraf(BOT_TOKEN);
 
-// Serve static files
-app.use(express.static(publicDir));
+bot.on("audio", async (ctx) => {
+  const fileName = ctx.message.audio.file_name || "unknown.mp3";
+  const fileUrl = await ctx.telegram.getFileLink(ctx.message.audio.file_id);
 
-// Route to fetch songs.json
-app.get('/songs', (req,res)=>{
-    const songs = JSON.parse(fs.readFileSync(songsJsonFile,'utf8'));
-    res.json(songs);
+  // Firestore এ গান সংরক্ষণ
+  await addDoc(collection(db, "songs"), {
+    title: fileName,
+    url: fileUrl.href
+  });
+
+  await ctx.reply("✅ Uploaded to Firebase!");
 });
 
-// Telegram Bot → receive audio/document
-bot.on(['audio','document'], async (ctx)=>{
-    try{
-        let fileId, fileName, title;
+bot.launch();
 
-        if(ctx.message.audio){
-            fileId = ctx.message.audio.file_id;
-            fileName = ctx.message.audio.file_name || ctx.message.audio.title+".mp3";
-            title = ctx.message.audio.title || fileName;
-        } else if(ctx.message.document && ctx.message.document.mime_type.includes("audio")){
-            fileId = ctx.message.document.file_id;
-            fileName = ctx.message.document.file_name;
-            title = fileName;
-        } else return ctx.reply("❌ Only audio/mp3 allowed!");
-
-        // Get Telegram file URL
-        const file = await ctx.telegram.getFile(fileId);
-        const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-
-        // Download file
-        const localPath = path.join(songsFolder, fileName);
-        const writer = fs.createWriteStream(localPath);
-        const response = await axios({ url, method:'GET', responseType:'stream' });
-        response.data.pipe(writer);
-
-        writer.on('finish', ()=>{
-            console.log("✅ Saved:", localPath);
-
-            // Update songs.json
-            let songs = [];
-            if(fs.existsSync(songsJsonFile)){
-                songs = JSON.parse(fs.readFileSync(songsJsonFile,'utf8'));
-            }
-
-            // Check if song already exists to avoid duplicates
-            if(!songs.some(s=>s.url === `/songs/${fileName}`)){
-                songs.push({ title, url: `/songs/${fileName}` });
-                fs.writeFileSync(songsJsonFile, JSON.stringify(songs,null,2));
-                console.log("✅ songs.json updated!");
-            }
-        });
-
-        writer.on('error', (err)=>{
-            console.error("❌ Error writing file:", err);
-        });
-
-        ctx.reply(`✅ Uploaded successfully: ${fileName}`);
-    } catch(err){
-        console.error(err);
-        ctx.reply("❌ Error uploading!");
-    }
+// Frontend থেকে গান নেওয়ার API
+app.get("/songs", async (req, res) => {
+  const querySnapshot = await getDocs(collection(db, "songs"));
+  const songs = querySnapshot.docs.map(doc => doc.data());
+  res.json(songs);
 });
 
-// Start Bot
-bot.launch().then(()=>console.log("🤖 Bot started!"));
-
-// Start Express server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=>console.log(`🌐 Server running at http://localhost:${PORT}`));
+app.listen(3000, () => console.log("🚀 Server running on port 3000"));
