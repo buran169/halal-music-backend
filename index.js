@@ -5,11 +5,11 @@ const axios = require('axios');
 const path = require('path');
 const cors = require('cors');
 
-// Telegram Bot Token (Railway env variable: BOT_TOKEN)
-const BOT_TOKEN = process.env.BOT_TOKEN || "YOUR_BOT_TOKEN_HERE";
+// Telegram Bot Token (set in Render/Replit environment variables)
+const BOT_TOKEN = process.env.BOT_TOKEN || "7931123058:AAFntxRe-I3DEKBvvb4XX2Kv3M775zgorME";
 const bot = new Telegraf(BOT_TOKEN);
 
-// Express Server
+// Express server setup
 const app = express();
 app.use(cors());
 app.use(express.static('public'));
@@ -18,27 +18,24 @@ app.use(express.json());
 // Ensure folders/files exist
 const songsFolder = path.join(__dirname, 'public/songs');
 const songsJson = path.join(__dirname, 'public/songs.json');
+
 if (!fs.existsSync(songsFolder)) fs.mkdirSync(songsFolder, { recursive: true });
 if (!fs.existsSync(songsJson)) fs.writeFileSync(songsJson, "[]");
 
-// Telegram Bot → Listen for audio & mp3 files
+// Telegram Bot: listen for audio & document (mp3)
 bot.on(['audio', 'document'], async (ctx) => {
   try {
     let fileId, fileName, title;
 
-    // Handle audio
     if(ctx.message.audio){
       fileId = ctx.message.audio.file_id;
       fileName = ctx.message.audio.file_name || ctx.message.audio.title + ".mp3";
       title = ctx.message.audio.title || fileName;
-    } 
-    // Handle document (mp3)
-    else if(ctx.message.document && ctx.message.document.mime_type.includes("audio")){
+    } else if(ctx.message.document && ctx.message.document.mime_type.includes("audio")){
       fileId = ctx.message.document.file_id;
       fileName = ctx.message.document.file_name;
       title = fileName;
-    } 
-    else {
+    } else {
       return ctx.reply("❌ Only audio/mp3 files allowed!");
     }
 
@@ -76,7 +73,18 @@ bot.on(['audio', 'document'], async (ctx) => {
 // Start Telegram Bot
 bot.launch();
 
-// Express Server to serve songs & JSON
+// Serve frontend index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+// Serve songs.json API
+app.get('/songs', (req, res) => {
+  const songs = JSON.parse(fs.readFileSync(songsJson, 'utf8'));
+  res.json(songs);
+});
+
+// Start Express server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
