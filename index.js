@@ -31,7 +31,8 @@ bot.on(["voice","audio"], async (ctx) => {
     if(ctx.message.voice) fileId = ctx.message.voice.file_id;
     else if(ctx.message.audio) fileId = ctx.message.audio.file_id;
 
-    const title = ctx.message.caption || "Untitled Song";
+   let title = message.caption || "Unknown";
+   title = title.replace(/@\S+/g, "").trim(); // সব @username remove করবে
     const fileLink = await ctx.telegram.getFileLink(fileId);
 
     const { data, error } = await supabase.from("songs").insert([
@@ -39,7 +40,7 @@ bot.on(["voice","audio"], async (ctx) => {
     ]);
     if (error) throw error;
 
-    ctx.reply(`✅ Song saved: ${title}`);
+    ctx.reply(`✅ Song successfully saved: ${title}`);
   } catch (err) {
     console.error(err);
     ctx.reply("❌ Failed to save song.");
