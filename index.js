@@ -1,28 +1,53 @@
 const { Telegraf } = require('telegraf');
 const express = require('express');
 const fs = require('fs');
-const axios = require('axios');
 const path = require('path');
+const axios = require('axios');
 const cors = require('cors');
 
-// Telegram Bot Token (set in Render/Replit environment variables)
-const BOT_TOKEN = process.env.BOT_TOKEN || "7931123058:AAFntxRe-I3DEKBvvb4XX2Kv3M775zgorME";
+// Telegram Bot Token (environment variable)
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if(!BOT_TOKEN){
+  console.error("❌ BOT_TOKEN not set in environment variables!");
+  process.exit(1);
+}
+
 const bot = new Telegraf(BOT_TOKEN);
 
-// Express server setup
+// Express setup
 const app = express();
 app.use(cors());
-app.use(express.static('public'));
 app.use(express.json());
 
 // Ensure folders/files exist
-const songsFolder = path.join(__dirname, 'public/songs');
-const songsJson = path.join(__dirname, 'public/songs.json');
+const publicDir = path.join(__dirname, 'public');
+const songsFolder = path.join(publicDir, 'songs');
+const songsJsonFile = path.join(publicDir, 'songs.json');
 
-if (!fs.existsSync(songsFolder)) fs.mkdirSync(songsFolder, { recursive: true });
-if (!fs.existsSync(songsJson)) fs.writeFileSync(songsJson, "[]");
+if(!fs.existsSync(publicDir)) fs.mkdirSync(publicDir);
+if(!fs.existsSync(songsFolder)) fs.mkdirSync(songsFolder);
+if(!fs.existsSync(songsJsonFile)) fs.writeFileSync(songsJsonFile, '[]');
 
-// Telegram Bot: listen for audio & document (mp3)
+// Serve static files
+app.use(express.static(publicDir));
+
+// Root route → serve index.html
+app.get('/', (req, res) => {
+  const indexPath = path.join(publicDir, 'index.html');
+  if(fs.existsSync(indexPath)){
+    res.sendFile(indexPath);
+  } else {
+    res.send('<h1>Frontend index.html not found!</h1>');
+  }
+});
+
+// Songs API
+app.get('/songs', (req, res) => {
+  const songs = JSON.parse(fs.readFileSync(songsJsonFile, 'utf8'));
+  res.json(songs);
+});
+
+// Telegram Bot → listen for audio & mp3 document
 bot.on(['audio', 'document'], async (ctx) => {
   try {
     let fileId, fileName, title;
@@ -39,28 +64,27 @@ bot.on(['audio', 'document'], async (ctx) => {
       return ctx.reply("❌ Only audio/mp3 files allowed!");
     }
 
-    // Get Telegram file URL
+    // Telegram file URL
     const file = await ctx.telegram.getFile(fileId);
     const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
 
-    // Download & save locally
+    // Download & save
     const localPath = path.join(songsFolder, fileName);
     const writer = fs.createWriteStream(localPath);
     const response = await axios({ url, method: 'GET', responseType: 'stream' });
     response.data.pipe(writer);
 
     writer.on('finish', () => {
-      console.log('File saved:', localPath);
-
+      console.log(`File saved: ${localPath}`);
       // Update songs.json
-      let songs = JSON.parse(fs.readFileSync(songsJson, 'utf8'));
+      let songs = JSON.parse(fs.readFileSync(songsJsonFile, 'utf8'));
       songs.push({
-        title: title,
+        title,
         artist: ctx.message.from.first_name,
         url: `/songs/${fileName}`,
         albumCover: "https://via.placeholder.com/100"
       });
-      fs.writeFileSync(songsJson, JSON.stringify(songs, null, 2));
+      fs.writeFileSync(songsJsonFile, JSON.stringify(songs, null, 2));
     });
 
     ctx.reply("✅ Uploaded successfully!");
@@ -71,18 +95,7 @@ bot.on(['audio', 'document'], async (ctx) => {
 });
 
 // Start Telegram Bot
-bot.launch();
-
-// Serve frontend index.html
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public/index.html'));
-});
-
-// Serve songs.json API
-app.get('/songs', (req, res) => {
-  const songs = JSON.parse(fs.readFileSync(songsJson, 'utf8'));
-  res.json(songs);
-});
+bot.launch().then(() => console.log("Bot launched successfully!"));
 
 // Start Express server
 const PORT = process.env.PORT || 3000;
