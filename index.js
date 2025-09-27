@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const { Telegraf } = require('telegraf');
 const cors = require('cors');
@@ -53,12 +52,14 @@ bot.on('audio', async (ctx)=>{
         const file = ctx.message.audio;
         const title = file.file_name || "Unknown";
         const fileId = file.file_id;
-        const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileId}`; // direct file URL
+
+        // Telegram file URL
+        const fileLink = await ctx.telegram.getFileLink(fileId);
 
         // Save to Firestore
         await addDoc(collection(db, "songs"), {
             title: title,
-            url: fileUrl
+            url: fileLink.href
         });
 
         await ctx.reply(`✅ Saved "${title}"`);
