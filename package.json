@@ -1,22 +1,12 @@
 {
   "name": "halal-music-backend",
   "version": "1.0.0",
-  "description": "Backend for Halal Music App with Telegram Bot & Firebase",
   "main": "index.js",
-  "type": "commonjs",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "type": "module",
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "telegraf": "^4.16.3",
-    "firebase": "^11.10.0",
-    "axios": "^1.7.5"
-  },
-  "engines": {
-    "node": "18.x"
-  },
-  "author": "Burhan",
-  "license": "ISC"
+    "@supabase/supabase-js": "^2.0.0",
+    "express": "^4.18.2",
+    "telegraf": "^4.12.3",
+    "cors": "^2.8.5"
+  }
 }
